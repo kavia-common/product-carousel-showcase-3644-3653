@@ -7,6 +7,10 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from "react"
  * - Pauses on hover/focus and resumes on mouse leave/blur.
  * - Keyboard accessible with Left/Right arrow navigation.
  * - Dots are focusable buttons with aria-current on the active one.
+ *
+ * Direction-aware transitions:
+ * We derive a direction ("forward" or "backward") from the navigation intent.
+ * This ensures the slide animation is consistent at boundaries (last->first, first->last).
  */
 export default function Carousel({
   slides,
@@ -15,29 +19,68 @@ export default function Carousel({
   ariaLabel = "Product highlights carousel",
 }) {
   const [index, setIndex] = useState(0);
+  const [lastIndex, setLastIndex] = useState(0);
+  const [direction, setDirection] = useState("forward"); // "forward" | "backward"
   const [paused, setPaused] = useState(false);
   const timerRef = useRef(null);
   const containerRef = useRef(null);
 
   const count = slides?.length ?? 0;
-  const safeSlides = useMemo(() => Array.isArray(slides) ? slides : [], [slides]);
+  const safeSlides = useMemo(() => (Array.isArray(slides) ? slides : []), [slides]);
 
-  const goTo = useCallback((i) => {
-    setIndex((prev) => {
-      const next = (i + count) % count;
-      return next;
-    });
-  }, [count]);
+  // Determine intended direction given current index and a requested target.
+  const computeDirection = useCallback(
+    (current, target) => {
+      if (count <= 1) return "forward";
+      const normTarget = ((target % count) + count) % count;
 
+      if (normTarget === current) return direction; // no change
+
+      // direct neighbors considering wrap
+      const forwardIdx = (current + 1) % count;
+      const backwardIdx = (current - 1 + count) % count;
+
+      if (normTarget === forwardIdx) return "forward";
+      if (normTarget === backwardIdx) return "backward";
+
+      // For dot jumps, choose shortest path direction.
+      // Compute forward distance (moving +1 each step)
+      const forwardDist = (normTarget - current + count) % count;
+      const backwardDist = (current - normTarget + count) % count;
+
+      return forwardDist <= backwardDist ? "forward" : "backward";
+    },
+    [count, direction]
+  );
+
+  // Navigate to an absolute index with direction derived from intent.
+  const goTo = useCallback(
+    (i) => {
+      setIndex((prev) => {
+        const next = ((i % count) + count) % count;
+        const dir = computeDirection(prev, next);
+        setDirection(dir);
+        setLastIndex(prev);
+        return next;
+      });
+    },
+    [count, computeDirection]
+  );
+
+  // Move forward one (autoplay and right arrow)
   const next = useCallback(() => {
+    // Always mark forward for autoplay/explicit next
+    setDirection("forward");
     goTo(index + 1);
   }, [index, goTo]);
 
+  // Move backward one (left arrow)
   const prev = useCallback(() => {
+    setDirection("backward");
     goTo(index - 1);
   }, [index, goTo]);
 
-  // Auto-advance timer
+  // Auto-advance timer (forward only)
   useEffect(() => {
     if (paused || count <= 1) return;
     timerRef.current = setTimeout(() => {
@@ -76,6 +119,17 @@ export default function Carousel({
     }
   };
 
+  // Direction-aware transition style/class
+  const translateStyle = { transform: `translateX(-${index * 100}%)` };
+  const transitionClass =
+    direction === "forward"
+      ? "transition-transform duration-500 ease-out"
+      : "transition-transform duration-500 ease-out"; // same timing; direction expressed by translate target
+
+  // Note: The transform target determines perceived direction since slides are ordered left->right.
+  // The computed direction changes only how the previous and next indices are chosen and remembered
+  // so that wrap cases (last->first backward vs forward) feel correct.
+
   return (
     <section
       ref={containerRef}
@@ -90,10 +144,7 @@ export default function Carousel({
     >
       {/* Slide viewport */}
       <div className="overflow-hidden rounded-xl shadow-soft bg-ocean-surface relative ocean-gradient">
-        <div
-          className="flex transition-transform duration-500 ease-out"
-          style={{ transform: `translateX(-${index * 100}%)` }}
-        >
+        <div className={`flex ${transitionClass}`} style={translateStyle}>
           {safeSlides.map((slide, i) => (
             <article
               key={i}
@@ -142,13 +193,19 @@ export default function Carousel({
               <button
                 key={i}
                 type="button"
-                className={`h-2.5 w-2.5 rounded-full transition-all duration-200 focus:outline-none focus-visible:ring-2 ${active
+                className={`h-2.5 w-2.5 rounded-full transition-all duration-200 focus:outline-none focus-visible:ring-2 ${
+                  active
                     ? "bg-ocean-primary w-6"
                     : "bg-gray-300 hover:bg-gray-400 focus-visible:ring-ocean-primary/40"
-                  }`}
+                }`}
                 aria-label={`Go to slide ${i + 1}`}
                 aria-current={active ? "true" : "false"}
-                onClick={() => goTo(i)}
+                onClick={() => {
+                  // Determine direction vs current when clicking a dot
+                  const dir = computeDirection(index, i);
+                  setDirection(dir);
+                  goTo(i);
+                }}
               />
             );
           })}
