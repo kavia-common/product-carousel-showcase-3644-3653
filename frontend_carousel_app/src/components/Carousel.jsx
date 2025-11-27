@@ -36,6 +36,12 @@ export default function Carousel({
 
       if (normTarget === current) return direction; // no change
 
+      // Force left-to-right animation when wrapping from last -> first
+      // Example: current = count-1 and normTarget = 0
+      if (current === count - 1 && normTarget === 0) {
+        return "forward";
+      }
+
       // direct neighbors considering wrap
       const forwardIdx = (current + 1) % count;
       const backwardIdx = (current - 1 + count) % count;
