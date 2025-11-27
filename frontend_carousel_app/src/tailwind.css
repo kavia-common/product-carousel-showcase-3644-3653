@@ -1,0 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom utilities */
+@layer utilities {
+  .ocean-gradient {
+    @apply bg-gradient-to-br from-blue-500/10 to-gray-50;
+  }
+}
