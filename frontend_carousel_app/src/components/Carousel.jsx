@@ -36,10 +36,19 @@ export default function Carousel({
 
       if (normTarget === current) return direction; // no change
 
-      // Force left-to-right animation when wrapping from last -> first
-      // Example: current = count-1 and normTarget = 0
+      // PUBLIC_INTERFACE
+      // Force left-to-right visual animation when wrapping from last -> first.
+      // Rationale: Users expect the next slide to come in from the right when
+      // advancing forward, even at the boundary (count-1 -> 0). Without this,
+      // some heuristics may cause a right-to-left effect on wrap which feels reversed.
       if (current === count - 1 && normTarget === 0) {
         return "forward";
+      }
+
+      // Similarly, when wrapping from first -> last via explicit previous action,
+      // ensure the animation is right-to-left to match a backward intent.
+      if (current === 0 && normTarget === count - 1) {
+        return "backward";
       }
 
       // direct neighbors considering wrap
