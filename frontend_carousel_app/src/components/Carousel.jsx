@@ -3,14 +3,14 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from "react"
 /**
  * PUBLIC_INTERFACE
  * Carousel component for content slides.
- * - Auto-advances every intervalMs (default 5000ms).
+ * - Auto-advances every intervalMs (default 4000ms).
  * - Pauses on hover/focus and resumes on mouse leave/blur.
  * - Keyboard accessible with Left/Right arrow navigation.
  * - Dots are focusable buttons with aria-current on the active one.
  */
 export default function Carousel({
   slides,
-  intervalMs = 5000,
+  intervalMs = 4000,
   className = "",
   ariaLabel = "Product highlights carousel",
 }) {
